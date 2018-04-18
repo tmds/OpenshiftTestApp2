@@ -27,7 +27,7 @@ namespace mvc
             WebHost.CreateDefaultBuilder(args)
             .UseKestrel(
                 options =>
-                options.Listen(new IPEndPoint(IPAddress.Loopback, 8080), config =>
+                options.Listen(new IPEndPoint(IPAddress.Any, 8080), config =>
                 config.UseHttps(LoadCert()))
             )
                 .UseStartup<Startup>();
