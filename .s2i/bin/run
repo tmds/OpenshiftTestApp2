@@ -1,0 +1,6 @@
+#!/bin/bash
+
+export PATH=~/dotnet-preview2:$PATH
+
+# call base run script
+$STI_SCRIPTS_PATH/run

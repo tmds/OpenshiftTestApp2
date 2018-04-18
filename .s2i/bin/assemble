@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# download preview2
+curl https://download.microsoft.com/download/3/7/C/37C0D2E3-2056-4F9A-A67C-14DEFBD70F06/dotnet-sdk-2.1.300-preview2-008530-linux-x64.tar.gz -o /tmp/dotnet-sdk.tar.gz
+mkdir ~/dotnet-preview2
+tar xf /tmp/dotnet-sdk.tar.gz -C ~/dotnet-preview2
+
+export PATH=~/dotnet-preview2:$PATH
+
+# call base assemble script
+$STI_SCRIPTS_PATH/assemble
