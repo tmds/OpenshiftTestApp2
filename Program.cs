@@ -25,7 +25,7 @@ namespace mvc
             {
                 using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
                 {
-                    store.Open(OpenFlags.OpenExistingOnly | OpenFlags.ReadWrite);
+                    store.Open(OpenFlags.ReadWrite);
                     store.Add(new X509Certificate2(OpenShiftPaths.ClusterCABundle));
                 }
             }
