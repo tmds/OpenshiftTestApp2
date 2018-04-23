@@ -52,7 +52,7 @@ namespace mvc
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-            .ConfigureOpenShiftCertificate("/var/run/secrets/dotnet/certs")
+            .ConfigureOpenShiftCertificate("/var/run/secrets/service-cert")
             .UseStartup<Startup>();        
     }
 }
