@@ -25,7 +25,7 @@ namespace mvc
             if (OpenShiftEnvironment.IsOpenShift)
             {
                 System.Console.WriteLine("Running in OpenShift -> adding cluster ca bundle");
-                using (X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser))
+                using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
                 {
                     store.Open(OpenFlags.ReadWrite);
                     string[] lines = File.ReadAllLines(OpenShiftPaths.ClusterCABundle);
