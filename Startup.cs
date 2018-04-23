@@ -92,6 +92,7 @@ namespace mvc
         {
             if (OpenShiftEnvironment.IsOpenShift)
             {
+                System.Console.WriteLine("Running in OpenShift -> adding cluster ca bundle");
                 builder.UseKestrel(kestrelOptions =>
                     kestrelOptions.ConfigureHttpsDefaults(
                         httpsOptions => httpsOptions.ServerCertificate = CertificateLoader.LoadCert(mountPoint)));
