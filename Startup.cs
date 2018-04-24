@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.OpenSsl;
+using RedHat.OpenShift;
 
 namespace mvc
 {
@@ -29,15 +30,7 @@ namespace mvc
             return certWithPrivate;
         }
 
-        /*
-        +    // This class was derived from:
-        +    // https://github.com/bcgit/bc-csharp/blob/master/crypto/src/security/DotNetUtilities.cs
-        +    // Copyright (c) 2000 - 2017 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org)
-        +    //
-        +    // Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-        +    // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-        +    // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-         */
+
         public static RSAParameters ToRSAParameters(RsaPrivateCrtKeyParameters privKey)
         {
             RSAParameters rp = new RSAParameters();
@@ -81,16 +74,12 @@ namespace mvc
             }
         }
     }
-    public static class OpenShiftEnvironmentExtensions
-    {
-        public static bool IsOpenShift(IHostingEnvironment environment) => OpenShiftEnvironment.IsOpenShift;
-    }
 
     public static class OpenShiftWebHostBuilderExtensions
     {
         public static IWebHostBuilder ConfigureOpenShiftCertificate(this IWebHostBuilder builder, string mountPoint)
         {
-            if (OpenShiftEnvironment.IsOpenShift)
+            if (ContainerEnvironment.IsOpenShift)
             {
                 System.Console.WriteLine("Running in OpenShift -> adding cluster ca bundle");
                 builder.UseKestrel(kestrelOptions =>
@@ -98,32 +87,6 @@ namespace mvc
                         httpsOptions => httpsOptions.ServerCertificate = CertificateLoader.LoadCert(mountPoint)));
             }
             return builder;
-        }
-    }
-
-    public static class OpenShiftEnvironment
-    {
-        private static string _buildCommit;
-        private static string _buildName;
-        private static string _buildSource;
-        private static string _buildNamespace;
-        private static string _buildReference;
-
-        public static bool IsOpenShift = !string.IsNullOrEmpty(OpenShiftEnvironment.BuildName);
-
-        public static string BuildCommit => GetFromEnvironmentVariable("OPENSHIFT_BUILD_COMMIT", ref _buildCommit);
-        public static string BuildName => GetFromEnvironmentVariable("OPENSHIFT_BUILD_NAME", ref _buildName);
-        public static string BuildSource => GetFromEnvironmentVariable("OPENSHIFT_BUILD_SOURCE", ref _buildSource);
-        public static string BuildNamespace => GetFromEnvironmentVariable("OPENSHIFT_BUILD_NAMESPACE", ref _buildNamespace);
-        public static string BuildReference => GetFromEnvironmentVariable("OPENSHIFT_BUILD_REFERENCE", ref _buildReference);
-
-        private static string GetFromEnvironmentVariable(string name, ref string cached)
-        {
-            if (cached == null)
-            {
-                cached = Environment.GetEnvironmentVariable(name) ?? string.Empty;
-            }
-            return cached;
         }
     }
 
@@ -146,6 +109,7 @@ namespace mvc
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            System.Console.WriteLine("Startup.ConfigureServices");
             services.Configure<CookiePolicyOptions>(options =>
             {
                 // This lambda determines whether user consent for non-essential cookies is needed for a given request.
@@ -160,6 +124,7 @@ namespace mvc
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
+            System.Console.WriteLine("Startup.Configure");
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();

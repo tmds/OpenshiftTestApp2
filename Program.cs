@@ -22,7 +22,7 @@ namespace mvc
     {
         public static void Main(string[] args)
         {
-            if (OpenShiftEnvironment.IsOpenShift)
+            /*if (OpenShiftEnvironment.IsOpenShift)
             {
                 System.Console.WriteLine("Running in OpenShift -> adding cluster ca bundle");
                 using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
@@ -46,13 +46,18 @@ namespace mvc
                         }
                     }
                 }
-            }
+            }*/
             CreateWebHostBuilder(args).Build().Run();
         }
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-            .ConfigureOpenShiftCertificate("/var/run/secrets/service-cert")
+            .ConfigureOpenShift(options =>
+                {
+                    options.ForceHttps = true;
+                    options.ServiceCertificateMountPoint = "/var/run/secrets/service-cert";
+                })
+            // .ConfigureOpenShiftCertificate("/var/run/secrets/service-cert")
             .UseStartup<Startup>();        
     }
 }
