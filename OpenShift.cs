@@ -47,20 +47,20 @@ namespace RedHat.OpenShift
 
     public class OpenShiftOptions
     {
-        public bool ForceHttps { get; set; } = false;
+        public bool ListenHttps { get; set; } = false;
 
         public string ServiceCertificateMountPoint { get; set; }
 
         public bool TrustClusterCertificateAuthority { get; set; } = true;
     }
 
-    internal class KestrelOptionsSetup : IConfigureOptions<KestrelServerOptions>
+    internal class OpenShiftKestrelOptionsSetup : IConfigureOptions<KestrelServerOptions>
     {
         private const int DotNetExposedPort = 8080;
 
         public OpenShiftOptions OpenShiftOptions { get; }
 
-        public KestrelOptionsSetup(IOptions<OpenShiftOptions> options)
+        public OpenShiftKestrelOptionsSetup(IOptions<OpenShiftOptions> options)
         {
             OpenShiftOptions = options.Value;
         }
@@ -80,7 +80,7 @@ namespace RedHat.OpenShift
                     });
                 }
 
-                bool forceHttps = OpenShiftOptions.ForceHttps;
+                bool forceHttps = OpenShiftOptions.ListenHttps;
                 if (forceHttps)
                 {
                     options.Listen(IPAddress.Any, DotNetExposedPort, listenOptions => listenOptions.UseHttps());
@@ -89,12 +89,12 @@ namespace RedHat.OpenShift
         }
     }
 
-    internal class ServerStartup : IStartupFilter
+    internal class OpenShiftServerStartup : IStartupFilter
     {
         private const string ClusterCABundle = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt";
         public OpenShiftOptions OpenShiftOptions { get; }
 
-        public ServerStartup(IOptions<OpenShiftOptions> options)
+        public OpenShiftServerStartup(IOptions<OpenShiftOptions> options)
         {
             OpenShiftOptions = options.Value;
         }
@@ -243,8 +243,8 @@ namespace Microsoft.AspNetCore.Hosting
             {
                 services.Configure(configureOptions);
 
-                services.AddTransient<IConfigureOptions<KestrelServerOptions>, KestrelOptionsSetup>();
-                services.AddTransient<IStartupFilter, ServerStartup>();
+                services.AddTransient<IConfigureOptions<KestrelServerOptions>, OpenShiftKestrelOptionsSetup>();
+                services.AddTransient<IStartupFilter, OpenShiftServerStartup>();
             });
 
             return builder;

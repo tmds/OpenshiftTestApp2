@@ -22,42 +22,16 @@ namespace mvc
     {
         public static void Main(string[] args)
         {
-            /*if (OpenShiftEnvironment.IsOpenShift)
-            {
-                System.Console.WriteLine("Running in OpenShift -> adding cluster ca bundle");
-                using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
-                {
-                    store.Open(OpenFlags.ReadWrite);
-                    string[] lines = File.ReadAllLines(OpenShiftPaths.ClusterCABundle);
-                    StringBuilder sb = new StringBuilder();
-                    foreach (var line in lines)
-                    {
-                        if (line.StartsWith("-----BEGIN"))
-                        {
-                            sb.Clear();
-                        }
-                        sb.AppendLine(line);
-                        if (line.StartsWith("-----END"))
-                        {
-                            string fileName = Path.GetTempFileName();
-                            File.WriteAllText(fileName, sb.ToString());
-                            System.Console.WriteLine(sb.ToString());
-                            store.Add(new X509Certificate2(fileName));
-                        }
-                    }
-                }
-            }*/
             CreateWebHostBuilder(args).Build().Run();
         }
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
             .ConfigureOpenShift(options =>
-                {
-                    options.ForceHttps = true;
-                    options.ServiceCertificateMountPoint = "/var/run/secrets/service-cert";
-                })
-            // .ConfigureOpenShiftCertificate("/var/run/secrets/service-cert")
+            {
+                options.ListenHttps = true;
+                options.ServiceCertificateMountPoint = "/var/run/secrets/service-cert";
+            })
             .UseStartup<Startup>();        
     }
 }
