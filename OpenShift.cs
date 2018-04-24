@@ -47,9 +47,7 @@ namespace RedHat.OpenShift
 
     public class OpenShiftOptions
     {
-        public bool ListenHttps { get; set; } = false;
-
-        public string ServiceCertificateMountPoint { get; set; }
+        public string CertificateMountPoint { get; set; }
 
         public bool TrustClusterCertificateAuthority { get; set; } = true;
     }
@@ -69,7 +67,7 @@ namespace RedHat.OpenShift
         {
             if (ContainerEnvironment.IsOpenShift)
             {
-                string certificateMountPoint = OpenShiftOptions.ServiceCertificateMountPoint;
+                string certificateMountPoint = OpenShiftOptions.CertificateMountPoint;
                 if (!string.IsNullOrEmpty(certificateMountPoint))
                 {
                     options.ConfigureHttpsDefaults(httpsOptions =>
@@ -78,11 +76,7 @@ namespace RedHat.OpenShift
                         string keyFile = Path.Combine(certificateMountPoint, "tls.key");
                         httpsOptions.ServerCertificate = CertificateLoader.LoadCertificateWithKey(certificateFile, keyFile);
                     });
-                }
 
-                bool forceHttps = OpenShiftOptions.ListenHttps;
-                if (forceHttps)
-                {
                     options.Listen(IPAddress.Any, DotNetExposedPort, listenOptions => listenOptions.UseHttps());
                 }
             }

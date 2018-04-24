@@ -29,8 +29,7 @@ namespace mvc
             WebHost.CreateDefaultBuilder(args)
             .ConfigureOpenShift(options =>
             {
-                options.ListenHttps = true;
-                options.ServiceCertificateMountPoint = "/var/run/secrets/service-cert";
+                options.CertificateMountPoint = "/var/run/secrets/service-cert";
             })
             .UseStartup<Startup>();        
     }
