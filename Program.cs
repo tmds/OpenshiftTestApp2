@@ -27,7 +27,7 @@ namespace mvc
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-            .ConfigureOpenShift(options =>
+            .UseOpenShiftIntegration(options =>
             {
                 options.CertificateMountPoint = "/var/run/secrets/service-cert";
             })
