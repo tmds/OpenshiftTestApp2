@@ -1,3 +1,6 @@
+// Copyright 2018 Red Hat, Inc.
+// Licensed under the MIT License.
+
 namespace RedHat.OpenShift
 {
     using System;
