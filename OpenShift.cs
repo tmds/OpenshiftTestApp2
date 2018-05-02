@@ -108,11 +108,6 @@ namespace RedHat.OpenShift
                         loop = false;
                         DateTime now = DateTime.Now;
                         TimeSpan tillExpires = expiresAt - now;
-
-                        // TODO: remove
-                        await Task.Delay(TimeSpan.FromMinutes(2));
-                        tillExpires = TimeSpan.Zero;
-
                         if (tillExpires > TimeSpan.Zero)
                         {
                             if (tillExpires > RestartSpan)
