@@ -82,10 +82,8 @@ namespace RedHat.OpenShift
         private static TimeSpan NotAfterMargin => TimeSpan.FromMinutes(15);
         private readonly IOptions<OpenShiftIntegrationOptions> _options;
         private readonly OpenShiftCertificateLoader _certificateLoader;
-        private readonly CancellationTokenSource _stoppingCts = new CancellationTokenSource();
         private readonly IApplicationLifetime _applicationLifetime;
         private readonly ILogger<OpenShiftCertificateExpiration> _logger;
-        private Task _executingTask;
 
         public OpenShiftCertificateExpiration(IOptions<OpenShiftIntegrationOptions> options, OpenShiftCertificateLoader certificateLoader, IApplicationLifetime applicationLifetime, ILogger<OpenShiftCertificateExpiration> logger)
         {
@@ -200,13 +198,10 @@ namespace RedHat.OpenShift
                     sb.Clear();
                 }
                 sb.AppendLine(line);
-                // TODO: avoid having to write these files
                 if (line.StartsWith(EndString))
                 {
-                    string fileName = Path.GetTempFileName();
-                    File.WriteAllText(fileName, sb.ToString());
-                    certificates.Add(new X509Certificate2(fileName));
-                    File.Delete(fileName);
+                    var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+                    certificates.Add(new X509Certificate2(bytes));
                 }
             }
 
