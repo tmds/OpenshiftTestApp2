@@ -37,6 +37,8 @@ namespace RedHat.OpenShift
     public class OpenShiftIntegrationOptions
     {
         public string CertificateMountPoint { get; set; }
+
+        internal bool UseHttps => !string.IsNullOrEmpty(CertificateMountPoint);
     }
 }
 
@@ -48,8 +50,12 @@ namespace Microsoft.AspNetCore.Hosting
     using System.Security.Cryptography;
     using System.Security.Cryptography.X509Certificates;
     using System.Text;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Microsoft.AspNetCore.Server.Kestrel.Core;
     using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Hosting;
+    using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
     using Org.BouncyCastle.Crypto;
     using Org.BouncyCastle.Crypto.Parameters;
@@ -77,17 +83,6 @@ namespace Microsoft.AspNetCore.Hosting
 
             if (PlatformEnvironment.IsOpenShift)
             {
-                var openShiftOptions = new OpenShiftIntegrationOptions();
-                configureOptions(openShiftOptions);
-
-                string certificateMountPoint = openShiftOptions.CertificateMountPoint;
-                bool useHttps = !string.IsNullOrEmpty(certificateMountPoint);
-
-                if (useHttps)
-                {
-                    builder.UseSetting(WebHostDefaults.ServerUrlsKey, "https://*:8080");
-                }
-
                 using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
                 {
                     store.Open(OpenFlags.ReadWrite);
@@ -95,33 +90,152 @@ namespace Microsoft.AspNetCore.Hosting
                     List<X509Certificate2> certificates = CertificateLoader.LoadCertificatesFromCABundle(ClusterCABundle);
                     foreach (var cert in certificates)
                     {
+                        System.Console.WriteLine($"cert is valid till {cert.NotAfter}");
                         store.Add(cert);
                     }
                 }
 
-                if (useHttps)
+                builder.ConfigureServices(services =>
                 {
-                    builder.ConfigureServices(services =>
-                    {
-                        services.Configure<KestrelServerOptions>(kestrelServerOptions =>
-                        {
-                            if (!string.IsNullOrEmpty(certificateMountPoint))
-                            {
-                                kestrelServerOptions.ConfigureHttpsDefaults(httpsOptions =>
-                                {
-                                    string certificateFile = Path.Combine(certificateMountPoint, "tls.crt");
-                                    string keyFile = Path.Combine(certificateMountPoint, "tls.key");
-                                    httpsOptions.ServerCertificate = CertificateLoader.LoadCertificateWithKey(certificateFile, keyFile);
-                                });
-                            }
-                        });
-                    });
-                }
+                    services.Configure(configureOptions);
+                    services.AddSingleton<OpenShiftCertificateLoader>();
+                    services.AddTransient<IConfigureOptions<KestrelServerOptions>, KestrelOptionsSetup>();
+                    services.AddTransient<IHostedService, OpenShiftCertificateExpiration>();
+                });
             }
 
             _setup = true;
 
             return builder;
+        }
+
+        internal class KestrelOptionsSetup : IConfigureOptions<KestrelServerOptions>
+        {
+            private readonly IOptions<OpenShiftIntegrationOptions> _options;
+            private readonly OpenShiftCertificateLoader _certificateLoader;
+
+            public KestrelOptionsSetup(IOptions<OpenShiftIntegrationOptions> options, OpenShiftCertificateLoader certificateLoader)
+            {
+                _options = options;
+                _certificateLoader = certificateLoader;
+            }
+
+            public void Configure(KestrelServerOptions options)
+            {
+                if (_options.Value.UseHttps)
+                {
+                    options.ListenAnyIP(8080, configureListen => configureListen.UseHttps(_certificateLoader.ServiceCertificate));
+                }
+            }
+        }
+
+        internal class OpenShiftCertificateExpiration : IHostedService
+        {
+            private static TimeSpan RestartSpan => TimeSpan.FromMinutes(15);
+            private static TimeSpan NotAfterMargin => TimeSpan.FromMinutes(15);
+            private readonly IOptions<OpenShiftIntegrationOptions> _options;
+            private readonly OpenShiftCertificateLoader _certificateLoader;
+            private readonly CancellationTokenSource _stoppingCts = new CancellationTokenSource();
+            private readonly IApplicationLifetime _applicationLifetime;
+            private readonly ILogger<OpenShiftCertificateExpiration> _logger;
+            private Task _executingTask;
+
+            public OpenShiftCertificateExpiration(IOptions<OpenShiftIntegrationOptions> options, OpenShiftCertificateLoader certificateLoader, IApplicationLifetime applicationLifetime, ILogger<OpenShiftCertificateExpiration> logger)
+            {
+                _options = options;
+                _certificateLoader = certificateLoader;
+                _applicationLifetime = applicationLifetime;
+                _logger = logger;
+            }
+
+            public Task StartAsync(CancellationToken cancellationToken)
+            {
+                // Store the task we're executing
+                _executingTask = ExecuteAsync(_stoppingCts.Token);
+
+                // If the task is completed then return it,
+                // this will bubble cancellation and failure to the caller
+                if (_executingTask.IsCompleted)
+                {
+                    return _executingTask;
+                }
+
+                // Otherwise it's running
+                return Task.CompletedTask;
+            }
+
+            public async Task StopAsync(CancellationToken cancellationToken)
+            {
+                // Stop called without start
+                if (_executingTask == null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    // Signal cancellation to the executing method
+                    _stoppingCts.Cancel();
+                }
+                finally
+                {
+                    // Wait until the task completes or the stop token triggers
+                    await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite,
+                                                                cancellationToken));
+                }
+            }
+
+            private async Task ExecuteAsync(CancellationToken token)
+            {
+                if (_options.Value.UseHttps)
+                {
+                    X509Certificate2 certificate = _certificateLoader.ServiceCertificate;
+                    DateTime expiresAt = certificate.NotAfter - NotAfterMargin; // NotAfter is in local time.
+                    DateTime now = DateTime.Now;
+                    TimeSpan tillExpires = expiresAt - now;
+                    if (tillExpires > TimeSpan.Zero)
+                    {
+                        if (tillExpires > RestartSpan)
+                        {
+                            // Wait until we are in the RestartSpan.
+                            await Task.Delay(tillExpires - RestartSpan
+                                + TimeSpan.FromSeconds(new Random().Next((int)RestartSpan.TotalSeconds)), token);
+                        }
+                    }
+                    // Our certificate expired, Stop the application.
+                    _logger.LogInformation($"Certificate expires at {certificate.NotAfter.ToUniversalTime()}. Stopping application.");
+                    _applicationLifetime.StopApplication();
+                }
+            }
+        }
+
+        internal class OpenShiftCertificateLoader
+        {
+            private readonly IOptions<OpenShiftIntegrationOptions> _options;
+            private X509Certificate2 _certificate;
+
+            public OpenShiftCertificateLoader(IOptions<OpenShiftIntegrationOptions> options)
+            {
+                _options = options;
+            }
+
+            public X509Certificate2 ServiceCertificate
+            {
+                get
+                {
+                    if (_certificate == null)
+                    {
+                        if (_options.Value.UseHttps)
+                        {
+                            string certificateMountPoint = _options.Value.CertificateMountPoint;
+                            string certificateFile = Path.Combine(certificateMountPoint, "tls.crt");
+                            string keyFile = Path.Combine(certificateMountPoint, "tls.key");
+                            _certificate = CertificateLoader.LoadCertificateWithKey(certificateFile, keyFile);
+                        }
+                    }
+                    return _certificate;
+                }
+            }
         }
 
         internal static class CertificateLoader
