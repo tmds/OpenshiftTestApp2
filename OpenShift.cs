@@ -191,15 +191,36 @@ namespace Microsoft.AspNetCore.Hosting
                 {
                     X509Certificate2 certificate = _certificateLoader.ServiceCertificate;
                     DateTime expiresAt = certificate.NotAfter - NotAfterMargin; // NotAfter is in local time.
-                    DateTime now = DateTime.Now;
-                    TimeSpan tillExpires = expiresAt - now;
-                    if (tillExpires > TimeSpan.Zero)
+                    while (true)
                     {
-                        if (tillExpires > RestartSpan)
+                        DateTime now = DateTime.Now;
+                        TimeSpan tillExpires = expiresAt - now;
+                        if (tillExpires > TimeSpan.Zero)
                         {
-                            // Wait until we are in the RestartSpan.
-                            await Task.Delay(tillExpires - RestartSpan
-                                + TimeSpan.FromSeconds(new Random().Next((int)RestartSpan.TotalSeconds)), token);
+                            if (tillExpires > RestartSpan)
+                            {
+                                // Wait until we are in the RestartSpan.
+                                TimeSpan delay = tillExpires - RestartSpan
+                                    + TimeSpan.FromSeconds(new Random().Next((int)RestartSpan.TotalSeconds));
+                                if (delay.TotalMilliseconds > int.MaxValue)
+                                {
+                                    // Task.Delay is limited to int.MaxValue.
+                                    await Task.Delay(int.MaxValue, token);
+                                }
+                                else
+                                {
+                                    await Task.Delay(delay, token);
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            break;
                         }
                     }
                     // Our certificate expired, Stop the application.
