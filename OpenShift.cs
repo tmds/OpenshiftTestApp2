@@ -76,7 +76,7 @@ namespace RedHat.OpenShift
         }
     }
 
-    internal class OpenShiftCertificateExpiration : Microsoft.Extensions.Hosting.IHostedService
+    internal class OpenShiftCertificateExpiration : Microsoft.Extensions.Hosting.BackgroundService
     {
         private static TimeSpan RestartSpan => TimeSpan.FromMinutes(15);
         private static TimeSpan NotAfterMargin => TimeSpan.FromMinutes(15);
@@ -95,77 +95,50 @@ namespace RedHat.OpenShift
             _logger = logger;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
-        {
-            // Store the task we're executing
-            _executingTask = ExecuteAsync(_stoppingCts.Token);
-
-            // If the task is completed then return it,
-            // this will bubble cancellation and failure to the caller
-            if (_executingTask.IsCompleted)
-            {
-                return _executingTask;
-            }
-
-            // Otherwise it's running
-            return Task.CompletedTask;
-        }
-
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            // Stop called without start
-            if (_executingTask == null)
-            {
-                return;
-            }
-
-            try
-            {
-                // Signal cancellation to the executing method
-                _stoppingCts.Cancel();
-            }
-            finally
-            {
-                // Wait until the task completes or the stop token triggers
-                await Task.WhenAny(_executingTask, Task.Delay(Timeout.Infinite,
-                                                            cancellationToken));
-            }
-        }
-
-        private async Task ExecuteAsync(CancellationToken token)
+        protected override async Task ExecuteAsync(CancellationToken token)
         {
             if (_options.Value.UseHttps)
             {
-                X509Certificate2 certificate = _certificateLoader.ServiceCertificate;
-                DateTime expiresAt = certificate.NotAfter - NotAfterMargin; // NotAfter is in local time.
-                bool loop;
+                try
                 {
-                    loop = false;
-                    DateTime now = DateTime.Now;
-                    TimeSpan tillExpires = expiresAt - now;
-                    if (tillExpires > TimeSpan.Zero)
+                    X509Certificate2 certificate = _certificateLoader.ServiceCertificate;
+                    DateTime expiresAt = certificate.NotAfter - NotAfterMargin; // NotAfter is in local time.
+                    bool loop;
                     {
-                        if (tillExpires > RestartSpan)
+                        loop = false;
+                        DateTime now = DateTime.Now;
+                        TimeSpan tillExpires = expiresAt - now;
+
+                        // TODO: remove
+                        await Task.Delay(TimeSpan.FromMinutes(2));
+                        tillExpires = TimeSpan.Zero;
+
+                        if (tillExpires > TimeSpan.Zero)
                         {
-                            // Wait until we are in the RestartSpan.
-                            TimeSpan delay = tillExpires - RestartSpan
-                                + TimeSpan.FromSeconds(new Random().Next((int)RestartSpan.TotalSeconds));
-                            if (delay.TotalMilliseconds > int.MaxValue)
+                            if (tillExpires > RestartSpan)
                             {
-                                // Task.Delay is limited to int.MaxValue.
-                                await Task.Delay(int.MaxValue, token);
-                                loop = true;
-                            }
-                            else
-                            {
-                                await Task.Delay(delay, token);
+                                // Wait until we are in the RestartSpan.
+                                TimeSpan delay = tillExpires - RestartSpan
+                                    + TimeSpan.FromSeconds(new Random().Next((int)RestartSpan.TotalSeconds));
+                                if (delay.TotalMilliseconds > int.MaxValue)
+                                {
+                                    // Task.Delay is limited to int.MaxValue.
+                                    await Task.Delay(int.MaxValue, token);
+                                    loop = true;
+                                }
+                                else
+                                {
+                                    await Task.Delay(delay, token);
+                                }
                             }
                         }
-                    }
-                } while (loop);
-                // Our certificate expired, Stop the application.
-                _logger.LogInformation($"Certificate expires at {certificate.NotAfter.ToUniversalTime()}. Stopping application.");
-                _applicationLifetime.StopApplication();
+                    } while (loop);
+                    // Our certificate expired, Stop the application.
+                    _logger.LogInformation($"Certificate expires at {certificate.NotAfter.ToUniversalTime()}. Stopping application.");
+                    _applicationLifetime.StopApplication();
+                }
+                catch (TaskCanceledException)
+                { }
             }
         }
     }
@@ -352,7 +325,6 @@ namespace Microsoft.AspNetCore.Hosting
                     services.AddTransient<IHostedService, OpenShiftCertificateExpiration>();
                 });
             }
-
             return builder;
         }
     }
