@@ -2,15 +2,12 @@
     "kind": "Template",
     "apiVersion": "v1",
     "metadata": {
-        "name": "dotnet-example",
+        "name": "dotnet-https-example",
         "annotations": {
-            "openshift.io/display-name": ".NET Core Example",
-            "description": "An example .NET Core application.",
+            "openshift.io/display-name": ".NET Core HTTPS Example",
+            "description": "An example .NET Core application using OpenShift service certificates.",
             "tags": "quickstart,dotnet,.net",
-            "iconClass": "icon-dotnet",
-            "template.openshift.io/provider-display-name": "Red Hat, Inc.",
-            "template.openshift.io/documentation-url": "https://github.com/redhat-developer/s2i-dotnetcore",
-            "template.openshift.io/support-url": "https://access.redhat.com"
+            "iconClass": "icon-dotnet"
         }
     },
     "objects": [
@@ -114,10 +111,6 @@
                             {
                                 "name": "DOTNET_CONFIGURATION",
                                 "value": "${DOTNET_CONFIGURATION}"
-                            },
-                            {
-                                "name": "DOTNET_PUBLISH",
-                                "value": "true"
                             },
                             {
                                 "name": "DOTNET_RESTORE_SOURCES",
@@ -258,21 +251,21 @@
             "displayName": "Name",
             "description": "The name assigned to all of the frontend objects defined in this template.",
             "required": true,
-            "value": "dotnet-example"
+            "value": "dotnet-https-example"
         },
         {
             "name": "MEMORY_LIMIT",
             "displayName": "Memory Limit",
             "description": "Maximum amount of memory the container can use.",
             "required": true,
-            "value": "100Mi"
+            "value": "512Mi"
         },
         {
             "name": "DOTNET_IMAGE_STREAM_TAG",
             "displayName": ".NET builder",
             "required": true,
             "description": "The image stream tag which is used to build the code.",
-            "value": "dotnet:2.0"
+            "value": "dotnet:2.1"
         },
         {
             "name": "NAMESPACE",
@@ -292,7 +285,7 @@
             "name": "SOURCE_REPOSITORY_REF",
             "displayName": "Git Reference",
             "description": "Set this to a branch name, tag or other ref of your repository if you are not using the default branch.",
-            "value": "dotnetcore-2.0"
+            "value": "dotnetcore-2.1-https"
         },
         {
             "name": "CONTEXT_DIR",
@@ -340,7 +333,7 @@
             "name": "DOTNET_NPM_TOOLS",
             "displayName": "Npm Tools",
             "description": "Set this to a space separated list of npm tools needed to publish.",
-            "value": "bower gulp"
+            "value": ""
         },
         {
             "name": "DOTNET_TEST_PROJECTS",
