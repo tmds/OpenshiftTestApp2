@@ -6,19 +6,14 @@ namespace RedHat.OpenShift
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Security.Cryptography;
     using System.Security.Cryptography.X509Certificates;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Server.Kestrel.Core;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using Org.BouncyCastle.Crypto;
-    using Org.BouncyCastle.Crypto.Parameters;
-    using Org.BouncyCastle.Math;
-    using Org.BouncyCastle.OpenSsl;
+    using RedHat.OpenShift.Utils;
 
     public static class PlatformEnvironment
     {
@@ -139,6 +134,7 @@ namespace RedHat.OpenShift
     internal class OpenShiftCertificateLoader
     {
         private const string ClusterCABundle = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt";
+        private static bool s_bundleAdded = false;
         private readonly IOptions<OpenShiftIntegrationOptions> _options;
         private X509Certificate2 _certificate;
 
@@ -167,6 +163,12 @@ namespace RedHat.OpenShift
 
         internal static void TrustClusterCABundle()
         {
+            if (s_bundleAdded)
+            {
+                return;
+            }
+            s_bundleAdded = true;
+
             using (X509Store store = new X509Store(StoreName.Root, StoreLocation.CurrentUser))
             {
                 store.Open(OpenFlags.ReadWrite);
@@ -179,8 +181,22 @@ namespace RedHat.OpenShift
             }
         }
     }
+}
 
-    internal static class CertificateLoader
+namespace RedHat.OpenShift.Utils
+{
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Security.Cryptography;
+    using System.Security.Cryptography.X509Certificates;
+    using System.Text;
+    using Org.BouncyCastle.Crypto;
+    using Org.BouncyCastle.Crypto.Parameters;
+    using Org.BouncyCastle.Math;
+    using Org.BouncyCastle.OpenSsl;
+
+    public static class CertificateLoader
     {
         private const string BeginString = "-----BEGIN ";
         private const string EndString = "-----END ";
@@ -288,20 +304,12 @@ namespace Microsoft.AspNetCore.Hosting
 
     public static class OpenShiftWebHostBuilderExtensions
     {
-        private static bool _setup;
-
         public static IWebHostBuilder UseOpenShiftIntegration(this IWebHostBuilder builder, Action<OpenShiftIntegrationOptions> configureOptions)
         {
             if (configureOptions == null)
             {
                 throw new ArgumentNullException(nameof(configureOptions));
             }
-
-            if (_setup)
-            {
-                throw new InvalidOperationException($"{nameof(UseOpenShiftIntegration)} was already called.");
-            }
-            _setup = true;
 
             if (PlatformEnvironment.IsOpenShift)
             {
