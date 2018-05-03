@@ -10,6 +10,7 @@ namespace RedHat.OpenShift
     using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Hosting;
+    using Microsoft.AspNetCore.Hosting.Server.Features;
     using Microsoft.AspNetCore.Server.Kestrel.Core;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -17,7 +18,7 @@ namespace RedHat.OpenShift
 
     public static class PlatformEnvironment
     {
-        public static bool IsOpenShift = !string.IsNullOrEmpty(OpenShiftEnvironment.BuildName);
+        public static bool IsOpenShift => !string.IsNullOrEmpty(OpenShiftEnvironment.BuildName);
     }
 
     public static class OpenShiftEnvironment
@@ -55,18 +56,24 @@ namespace RedHat.OpenShift
     {
         private readonly IOptions<OpenShiftIntegrationOptions> _options;
         private readonly OpenShiftCertificateLoader _certificateLoader;
+        private readonly IServerAddressesFeature _addresses;
 
-        public KestrelOptionsSetup(IOptions<OpenShiftIntegrationOptions> options, OpenShiftCertificateLoader certificateLoader)
+        public KestrelOptionsSetup(IOptions<OpenShiftIntegrationOptions> options, IServerAddressesFeature addresses, OpenShiftCertificateLoader certificateLoader)
         {
             _options = options;
             _certificateLoader = certificateLoader;
+            _addresses = addresses;
         }
 
         public void Configure(KestrelServerOptions options)
         {
             if (_options.Value.UseHttps)
             {
-                options.ListenAnyIP(8080, configureListen => configureListen.UseHttps(_certificateLoader.ServiceCertificate));
+                _addresses.Addresses.Clear();
+                _addresses.Addresses.Add("https://*:8080");
+
+                options.ConfigureHttpsDefaults(
+                    _ => _.ServerCertificate = _certificateLoader.ServiceCertificate);
             }
         }
     }
