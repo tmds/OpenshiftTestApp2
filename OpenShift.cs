@@ -56,24 +56,22 @@ namespace RedHat.OpenShift
     {
         private readonly IOptions<OpenShiftIntegrationOptions> _options;
         private readonly OpenShiftCertificateLoader _certificateLoader;
-        private readonly IServerAddressesFeature _addresses;
 
-        public KestrelOptionsSetup(IOptions<OpenShiftIntegrationOptions> options, IServerAddressesFeature addresses, OpenShiftCertificateLoader certificateLoader)
+        public KestrelOptionsSetup(IOptions<OpenShiftIntegrationOptions> options, OpenShiftCertificateLoader certificateLoader)
         {
             _options = options;
             _certificateLoader = certificateLoader;
-            _addresses = addresses;
         }
 
         public void Configure(KestrelServerOptions options)
         {
             if (_options.Value.UseHttps)
             {
-                _addresses.Addresses.Clear();
-                _addresses.Addresses.Add("https://*:8080");
-
-                options.ConfigureHttpsDefaults(
-                    _ => _.ServerCertificate = _certificateLoader.ServiceCertificate);
+                options.ListenAnyIP(8080, configureListen => configureListen.UseHttps(_certificateLoader.ServiceCertificate));
+            }
+            else
+            {
+                options.ListenAnyIP(8080);
             }
         }
     }
@@ -320,6 +318,8 @@ namespace Microsoft.AspNetCore.Hosting
 
             if (PlatformEnvironment.IsOpenShift)
             {
+                builder.UseUrls(new string[]{});
+
                 OpenShiftCertificateLoader.TrustClusterCABundle();
 
                 builder.ConfigureServices(services =>
