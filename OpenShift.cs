@@ -318,8 +318,10 @@ namespace Microsoft.AspNetCore.Hosting
 
             if (PlatformEnvironment.IsOpenShift)
             {
+                // Clear the urls. We'll explicitly configure Kestrel depending on the options.
                 builder.UseUrls(new string[]{});
 
+                // We can't do this at server scope, so just do it now.
                 OpenShiftCertificateLoader.TrustClusterCABundle();
 
                 builder.ConfigureServices(services =>
