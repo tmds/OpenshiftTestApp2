@@ -100,10 +100,10 @@ namespace RedHat.OpenShift
                 try
                 {
                     X509Certificate2 certificate = _certificateLoader.ServiceCertificate;
-                    DateTime expiresAt = certificate.NotAfter - NotAfterMargin; // NotAfter is in local time.
                     bool loop;
                     {
                         loop = false;
+                        DateTime expiresAt = certificate.NotAfter - NotAfterMargin; // NotAfter is in local time.
                         DateTime now = DateTime.Now;
                         TimeSpan tillExpires = expiresAt - now;
                         if (tillExpires > TimeSpan.Zero)
@@ -328,8 +328,8 @@ namespace Microsoft.AspNetCore.Hosting
                 {
                     services.Configure(configureOptions);
                     services.AddSingleton<OpenShiftCertificateLoader>();
-                    services.AddTransient<IConfigureOptions<KestrelServerOptions>, KestrelOptionsSetup>();
-                    services.AddTransient<IHostedService, OpenShiftCertificateExpiration>();
+                    services.AddSingleton<IConfigureOptions<KestrelServerOptions>, KestrelOptionsSetup>();
+                    services.AddSingleton<IHostedService, OpenShiftCertificateExpiration>();
                 });
             }
             return builder;
